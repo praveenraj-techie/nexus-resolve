@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.venv/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.coverage
+*.log
+data/generated/
+apps/dashboard/public/data/replay/
