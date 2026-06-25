@@ -1,0 +1,22 @@
+# Submission Checklist
+
+- [ ] Public GitHub repository exists as `nexus-resolve`.
+- [ ] GitHub Pages source is configured as GitHub Actions.
+- [ ] Public Pages URL opens Replay Mode.
+- [ ] Local backend starts on port 8000.
+- [ ] Dashboard starts on port 5173.
+- [ ] Replay mode loads without backend.
+- [ ] Local live mode works with `OPENAI_API_KEY`.
+- [ ] Mock fallback works without `OPENAI_API_KEY`.
+- [ ] SOP evidence is visible.
+- [ ] Unsafe precedent is visible and flagged.
+- [ ] Protected-path policy block is demonstrable.
+- [ ] Human approval is required before mock remediation.
+- [ ] No destructive command is executed.
+- [ ] Before and after metrics are visible.
+- [ ] RCA is generated.
+- [ ] Backend tests pass.
+- [ ] Dashboard tests and build pass.
+- [ ] Secret scan finds no `.env`, API key, real hostnames, emails, IPs, or customer data.
+- [ ] Demo video is 3-5 minutes. Local artifact: `media/nexus-resolve-demo.mp4`.
+- [ ] README explains OpenAI stack, Codex usage, safety model, and roadmap.
