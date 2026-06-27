@@ -8,7 +8,7 @@ The local repository already has an initial commit. Both
 `codex/nexus-resolve-build` and `main` point at the build commit.
 
 ```powershell
-cd D:\Hackathon\nexus-resolve
+cd "D:\Hackathon - Copy\nexus-resolve"
 git checkout main
 gh repo create nexus-resolve --public --source . --remote origin --push
 ```
@@ -36,6 +36,22 @@ Open the Pages URL and confirm:
 
 - The top bar shows `Replay Mode`.
 - `INC-2026-00421` appears in Ticket Details.
+- The scenario selector includes Linux, Firewall, Backup, Service Desk, AD,
+  Command Centre, and Cloud alerts.
 - `SOP beats history` appears.
 - Approval buttons are disabled in Replay Mode.
 - RCA and metrics appear after the timeline completes.
+
+## Verify Local Live Proof
+
+Before submitting the final video, run:
+
+```powershell
+cd "D:\Hackathon - Copy\nexus-resolve"
+.\scripts\check-all.cmd
+.\scripts\verify-live-openai.cmd
+.\scripts\start-demo.cmd
+```
+
+Use `http://localhost:5174/apps/deep-dive/#both` to show the real dashboard
+beside live API JSON and the hashed audit packet.

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from .models import EvidenceItem, IncidentTicket, PolicyCheck, RemediationPlan
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DATA_ROOT = PROJECT_ROOT / "data"
+from .scenario_catalog import (
+    DATA_ROOT,
+    PROJECT_ROOT,
+    get_scenario,
+    incident_for_scenario,
+    list_scenarios,
+)
 
 
 def read_json(path: Path) -> Any:
@@ -24,56 +28,61 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def get_default_incident() -> IncidentTicket:
-    return IncidentTicket.model_validate(
-        read_json(DATA_ROOT / "synthetic/incidents/disk-space-p4.json")
-    )
+    return incident_for_scenario("disk-space")
 
 
-def get_initial_state() -> dict[str, Any]:
-    return read_json(DATA_ROOT / "synthetic/mock-state/windows-fleet.initial.json")
+def get_incident_for_scenario(scenario_id: str) -> IncidentTicket:
+    return incident_for_scenario(scenario_id)
 
 
-def get_expected_after_state() -> dict[str, Any]:
-    return read_json(DATA_ROOT / "synthetic/mock-state/windows-fleet.after-disk.json")
+def get_scenario_summaries() -> list[dict[str, str]]:
+    return list_scenarios()
+
+
+def get_initial_state(ticket: IncidentTicket | None = None) -> dict[str, Any]:
+    scenario_id = ticket.scenario_id if ticket else "disk-space"
+    scenario = get_scenario(scenario_id)
+    state = deepcopy(scenario["initial_state"])
+    state["scenario"] = scenario
+    return state
+
+
+def get_expected_after_state(ticket: IncidentTicket | None = None) -> dict[str, Any]:
+    scenario_id = ticket.scenario_id if ticket else "disk-space"
+    return deepcopy(get_scenario(scenario_id)["after_state"])
 
 
 def retrieve_sop(ticket: IncidentTicket) -> EvidenceItem:
-    sop_path = DATA_ROOT / "synthetic/sops/SOP-WIN-DISK-001.md"
-    sop_text = sop_path.read_text(encoding="utf-8")
+    scenario = get_scenario(ticket.scenario_id)
+    sop = scenario["sop"]
     return EvidenceItem(
-        id="SOP-WIN-DISK-001",
+        id=sop["id"],
         type="sop",
-        title="Windows Application Log Disk Remediation SOP",
-        summary=(
-            "Delete only application logs older than 7 days, avoid protected "
-            "paths, require approval, and validate free space."
-        ),
-        source=str(sop_path.relative_to(PROJECT_ROOT)),
+        title=sop["title"],
+        summary=sop["summary"],
+        source=str((DATA_ROOT / "scenarios/catalog.json").relative_to(PROJECT_ROOT)),
         metadata={
             "ticket": ticket.incident_id,
-            "content": sop_text,
-            "protected_paths": [
-                "C:\\Windows",
-                "C:\\Windows\\System32",
-                "C:\\Program Files",
-                "C:\\Users",
-            ],
+            "scenario_id": ticket.scenario_id,
+            "team": ticket.team,
+            "content": sop["content"],
+            "controls": sop["controls"],
         },
     )
 
 
 def retrieve_similar_tickets(ticket: IncidentTicket) -> list[EvidenceItem]:
-    ticket_path = DATA_ROOT / "synthetic/tickets/historical-ticket-pack.jsonl"
-    rows = read_jsonl(ticket_path)
+    scenario = get_scenario(ticket.scenario_id)
+    source = DATA_ROOT / "scenarios/catalog.json"
     evidence: list[EvidenceItem] = []
-    for row in rows:
+    for row in scenario["history"]:
         evidence.append(
             EvidenceItem(
                 id=row["ticket_id"],
                 type="history",
                 title=row["summary"],
                 summary=row["notes"],
-                source=str(ticket_path.relative_to(PROJECT_ROOT)),
+                source=str(source.relative_to(PROJECT_ROOT)),
                 metadata={
                     **row,
                     "matched_ci": row.get("ci") == ticket.affected_ci,
@@ -84,41 +93,26 @@ def retrieve_similar_tickets(ticket: IncidentTicket) -> list[EvidenceItem]:
 
 
 def estimate_reclaimable_space(state: dict[str, Any]) -> float:
-    return float(
-        sum(
-            candidate.get("old_log_gb", 0)
-            for candidate in state.get("cleanup_candidates", [])
-            if candidate.get("safe_to_remove")
-        )
-    )
+    for metric in state.get("metrics", []):
+        value = str(metric.get("value", ""))
+        if value.endswith(" GB"):
+            try:
+                return float(value.removesuffix(" GB"))
+            except ValueError:
+                continue
+    return 0.0
 
 
 def validate_result(before: dict[str, Any], after: dict[str, Any]) -> PolicyCheck:
-    before_drive = before["drives"]["C:"]
-    after_drive = after["drives"]["C:"]
-    total_gb = after_drive["total_gb"]
-    free_percent = (after_drive["free_gb"] / total_gb) * 100
-    if free_percent < 15:
+    validation = after.get("validation") or before.get("validation")
+    if not validation:
         return PolicyCheck(
-            name="Free-space validation",
+            name="Scenario validation",
             status="blocked",
-            message="Free space remains below the 15% escalation threshold.",
-            evidence={
-                "before_free_gb": before_drive["free_gb"],
-                "after_free_gb": after_drive["free_gb"],
-                "free_percent": round(free_percent, 2),
-            },
+            message="Scenario did not provide validation evidence.",
+            evidence={},
         )
-    return PolicyCheck(
-        name="Free-space validation",
-        status="pass",
-        message="Free space is above the 15% threshold after mock remediation.",
-        evidence={
-            "before_free_gb": before_drive["free_gb"],
-            "after_free_gb": after_drive["free_gb"],
-            "free_percent": round(free_percent, 2),
-        },
-    )
+    return PolicyCheck.model_validate(validation)
 
 
 def policy_check(

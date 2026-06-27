@@ -17,24 +17,35 @@ from .models import (
     RcaSummary,
 )
 from .rca import fallback_rca
-from .tools import PROJECT_ROOT, estimate_reclaimable_space
+from .tools import PROJECT_ROOT
 
-try:
-    from dotenv import load_dotenv
 
-    load_dotenv(PROJECT_ROOT / ".env")
-except Exception:
-    pass
+def load_project_env() -> None:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip().lstrip("\ufeff")
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_project_env()
 
 
 class PlanOutput(BaseModel):
     summary: str
-    target_paths: list[str]
-    estimated_reclaim_gb: float
-    age_filter_days: int
-    powershell: str
+    target_resources: list[str]
+    action_preview: str
+    estimated_effect: str
+    safeguards: list[str]
     approval_required: bool
-    uses_whatif: bool
+    uses_dry_run: bool
     mock_only: bool
     validation_steps: list[str]
     escalation_condition: str
@@ -57,13 +68,9 @@ class ApprovalSummaryOutput(BaseModel):
     replay_side_effects_disabled: bool
 
 
-class RcaMetricsOutput(BaseModel):
-    reclaimed_gb: float
-    before_free_gb: float
-    after_free_gb: float
-    mttr_minutes: int
-    manual_steps_avoided: int
-    audit_completeness_percent: int
+class RcaMetricOutput(BaseModel):
+    label: str
+    value: str
 
 
 class RcaOutput(BaseModel):
@@ -72,7 +79,7 @@ class RcaOutput(BaseModel):
     validation: str
     business_impact: str
     follow_up: list[str]
-    metrics: RcaMetricsOutput
+    metrics: list[RcaMetricOutput]
 
 
 class NexusOpenAIClient:
@@ -87,6 +94,7 @@ class NexusOpenAIClient:
         self.model = model or os.getenv("OPENAI_MODEL", "gpt-5.5")
         self.mode = mode or os.getenv("APP_MODE", "mock")
         self.last_notice: str | None = None
+        self.last_response_source = "fallback"
 
     async def create_evidence_summary(
         self,
@@ -95,16 +103,21 @@ class NexusOpenAIClient:
         history: list[EvidenceItem],
         state: dict[str, Any],
     ) -> EvidenceSummary:
+        if self.mode == "live" and not self.api_key:
+            self.last_notice = "OpenAI API key is not configured, using validated fallback response"
         if self.mode == "live" and self.api_key:
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._create_evidence_summary_live, ticket, sop, history, state
                 )
+                self.last_response_source = "openai"
+                return result
             except Exception:
                 self.last_notice = (
                     "OpenAI unavailable, using validated fallback response"
                 )
-        return self._fallback_evidence_summary(history)
+        self.last_response_source = "fallback"
+        return self._fallback_evidence_summary(ticket, sop, history, state)
 
     async def create_plan(
         self,
@@ -113,41 +126,56 @@ class NexusOpenAIClient:
         history: list[EvidenceItem],
         state: dict[str, Any],
     ) -> RemediationPlan:
+        if self.mode == "live" and not self.api_key:
+            self.last_notice = "OpenAI API key is not configured, using validated fallback response"
         if self.mode == "live" and self.api_key:
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._create_plan_live, ticket, sop, history, state
                 )
+                self.last_response_source = "openai"
+                return result
             except Exception:
                 self.last_notice = (
                     "OpenAI unavailable, using validated fallback response"
                 )
+        self.last_response_source = "fallback"
         return self._fallback_plan(state)
 
     async def create_approval_summary(
         self, plan: RemediationPlan, checks: list[PolicyCheck]
     ) -> ApprovalSummary:
+        if self.mode == "live" and not self.api_key:
+            self.last_notice = "OpenAI API key is not configured, using validated fallback response"
         if self.mode == "live" and self.api_key:
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._create_approval_summary_live, plan, checks
                 )
+                self.last_response_source = "openai"
+                return result
             except Exception:
                 self.last_notice = (
                     "OpenAI unavailable, using validated fallback response"
                 )
+        self.last_response_source = "fallback"
         return self._fallback_approval_summary(plan)
 
     async def create_rca(
         self, before: dict[str, Any], after: dict[str, Any]
     ) -> RcaSummary:
+        if self.mode == "live" and not self.api_key:
+            self.last_notice = "OpenAI API key is not configured, using validated fallback response"
         if self.mode == "live" and self.api_key:
             try:
-                return await asyncio.to_thread(self._create_rca_live, before, after)
+                result = await asyncio.to_thread(self._create_rca_live, before, after)
+                self.last_response_source = "openai"
+                return result
             except Exception:
                 self.last_notice = (
                     "OpenAI unavailable, using validated fallback response"
                 )
+        self.last_response_source = "fallback"
         return fallback_rca(before, after)
 
     def _create_evidence_summary_live(
@@ -168,7 +196,10 @@ class NexusOpenAIClient:
                     "content": (
                         "Return an evidence summary as structured JSON. "
                         "Use supplied facts only. SOP outranks history. "
-                        "Be concise and outcome-first."
+                        "Write a fresh, operator-facing explanation for this "
+                        "specific incident. Do not copy the plan template or "
+                        "fallback phrasing verbatim. Mention the incident signal, "
+                        "the unsafe precedent, and why the SOP-governed path is safe."
                     ),
                 },
                 {
@@ -207,7 +238,10 @@ class NexusOpenAIClient:
                     "content": (
                         "You produce JSON only through structured outputs. "
                         "Use supplied facts only. SOP outranks historical tickets. "
-                        "The outcome is a safe, approval-gated, mock-only remediation plan."
+                        "The outcome is a safe, approval-gated, mock-only remediation "
+                        "plan. Write a fresh operator-ready plan for this exact "
+                        "scenario; do not copy the plan template verbatim. Keep the "
+                        "action mock-only and include measurable validation."
                     ),
                 },
                 {
@@ -229,12 +263,12 @@ class NexusOpenAIClient:
         parsed = response.output_parsed
         return RemediationPlan(
             summary=parsed.summary,
-            target_paths=parsed.target_paths,
-            estimated_reclaim_gb=parsed.estimated_reclaim_gb,
-            age_filter_days=parsed.age_filter_days,
-            powershell=parsed.powershell,
+            target_resources=parsed.target_resources,
+            action_preview=parsed.action_preview,
+            estimated_effect=parsed.estimated_effect,
+            safeguards=parsed.safeguards,
             approval_required=parsed.approval_required,
-            uses_whatif=parsed.uses_whatif,
+            uses_dry_run=parsed.uses_dry_run,
             mock_only=parsed.mock_only,
             validation_steps=parsed.validation_steps,
             escalation_condition=parsed.escalation_condition,
@@ -254,7 +288,9 @@ class NexusOpenAIClient:
                     "content": (
                         "Return an approval summary as structured JSON. "
                         "Use supplied facts only. The operator must understand "
-                        "that execution is blocked until approval."
+                        "that execution is blocked until approval. Explain the "
+                        "specific target, expected effect, and reason approval is "
+                        "safe for this incident."
                     ),
                 },
                 {
@@ -286,7 +322,10 @@ class NexusOpenAIClient:
                     "role": "system",
                     "content": (
                         "Return an RCA summary as structured JSON. Use supplied "
-                        "facts only. Keep it concise and audit-ready."
+                        "facts only. Write a fresh audit-ready RCA for this exact "
+                        "incident, with root cause, actions taken, validation, "
+                        "business impact, follow-up, and measurable metrics. Do not "
+                        "copy the fallback RCA wording verbatim."
                     ),
                 },
                 {
@@ -300,75 +339,63 @@ class NexusOpenAIClient:
         )
         parsed = response.output_parsed
         payload = parsed.model_dump()
-        payload["metrics"] = parsed.metrics.model_dump()
+        payload["metrics"] = {metric.label: metric.value for metric in parsed.metrics}
         return RcaSummary.model_validate(payload)
 
     def _fallback_evidence_summary(
-        self, history: list[EvidenceItem]
+        self,
+        ticket: IncidentTicket,
+        sop: EvidenceItem,
+        history: list[EvidenceItem],
+        state: dict[str, Any],
     ) -> EvidenceSummary:
+        if "evidence_summary" in state:
+            return EvidenceSummary.model_validate(state["evidence_summary"])
+
         unsafe = [item.id for item in history if not item.metadata.get("safe")]
         escalations = [
             item.id for item in history if item.metadata.get("outcome") == "escalated"
         ]
         safe_count = len(history) - len(unsafe) - len(escalations)
         return EvidenceSummary(
-            outcome=(
-                "Proceed with SOP-governed app log cleanup planning while excluding "
-                "unsafe historical precedent."
-            ),
-            sop_controls=[
-                "Delete only application logs older than 7 days.",
-                "Never touch protected paths or active logs.",
-                "Estimate reclaimed space before action.",
-                "Require human approval.",
-                "Validate free space after remediation.",
-                "Escalate if free space remains below 15%.",
-            ],
+            outcome=f"Proceed with SOP-governed mock remediation for {ticket.title}.",
+            sop_controls=list(sop.metadata.get("controls", [])),
             safe_precedent_count=safe_count,
             unsafe_precedent_ids=unsafe,
             escalation_precedent_ids=escalations,
             governance_note=(
-                "SOP beats history: HIST-2026-0037 is visible as a warning, "
+                f"SOP beats history: {unsafe[0]} is visible as a warning, "
                 "not copied into the remediation plan."
+                if unsafe
+                else "SOP controls drive the remediation plan."
             ),
         )
 
     def _fallback_plan(self, state: dict[str, Any]) -> RemediationPlan:
-        estimate = estimate_reclaimable_space(state)
+        if "plan_template" in state:
+            return RemediationPlan.model_validate(state["plan_template"])
+
         return RemediationPlan(
-            summary=(
-                "Clean approved application logs older than 7 days from C:\\App\\Logs "
-                "using a mock-only, approval-gated flow."
-            ),
-            target_paths=["C:\\App\\Logs"],
-            estimated_reclaim_gb=estimate,
-            age_filter_days=7,
-            powershell=(
-                "Get-ChildItem 'C:\\App\\Logs' -File -Recurse | "
-                "Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | "
-                "Remove-Item -WhatIf"
-            ),
+            summary="Run a scenario-approved mock remediation.",
+            target_resources=["synthetic-resource"],
+            action_preview="Mock action only.",
+            estimated_effect="Scenario validation should improve.",
+            safeguards=["Mock-only execution.", "Human approval required."],
             approval_required=True,
-            uses_whatif=True,
+            uses_dry_run=True,
             mock_only=True,
-            validation_steps=[
-                "Compare C: free GB before and after mock execution.",
-                "Confirm free space is at least 15% of capacity.",
-                "Confirm no active logs or protected paths were touched.",
-            ],
+            validation_steps=["Validate scenario metrics after mock execution."],
         )
 
     def _fallback_approval_summary(self, plan: RemediationPlan) -> ApprovalSummary:
-        target = ", ".join(plan.target_paths)
+        target = ", ".join(plan.target_resources)
         return ApprovalSummary(
             decision_required=True,
             operator_message=(
-                f"Approve mock-only cleanup for {target} using a "
-                f"{plan.age_filter_days}-day age filter and WhatIf review."
+                f"Approve mock-only remediation for {target}."
             ),
             expected_safe_effect=(
-                f"Expected reclaim is {plan.estimated_reclaim_gb:g} GB before "
-                "post-remediation validation."
+                f"{plan.estimated_effect} Post-remediation validation is required."
             ),
             blocked_until_approved=True,
             replay_side_effects_disabled=True,

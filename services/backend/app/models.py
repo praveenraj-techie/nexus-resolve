@@ -12,7 +12,9 @@ RunStatus = Literal[
     "created",
     "running",
     "waiting_approval",
-    "resolved",
+    "waiting_closure",
+    "observing",
+    "closed",
     "rejected",
     "blocked",
     "escalated",
@@ -29,6 +31,8 @@ def new_run_id() -> str:
 
 
 class IncidentTicket(BaseModel):
+    scenario_id: str = "disk-space"
+    team: str = "Windows Infra"
     incident_id: str
     priority: str
     title: str
@@ -37,6 +41,7 @@ class IncidentTicket(BaseModel):
     environment: str = "synthetic"
     symptoms: list[str] = Field(default_factory=list)
     metric_snapshot: dict[str, Any] = Field(default_factory=dict)
+    current_state: str = ""
     requested_outcome: str
 
 
@@ -67,16 +72,16 @@ class PolicyCheck(BaseModel):
 
 class RemediationPlan(BaseModel):
     summary: str
-    target_paths: list[str]
-    estimated_reclaim_gb: float
-    age_filter_days: int
-    powershell: str
+    target_resources: list[str]
+    action_preview: str
+    estimated_effect: str
+    safeguards: list[str] = Field(default_factory=list)
     approval_required: bool = True
     approval_granted: bool = False
-    uses_whatif: bool = True
+    uses_dry_run: bool = True
     mock_only: bool = True
     validation_steps: list[str] = Field(default_factory=list)
-    escalation_condition: str = "Escalate if C: free space remains below 15%."
+    escalation_condition: str = "Escalate if validation remains below threshold."
 
 
 class ApprovalSummary(BaseModel):
@@ -110,6 +115,7 @@ class RunSnapshot(BaseModel):
     run_id: str
     status: RunStatus
     events: list[RunEvent]
+    approval_record: dict[str, Any] | None = None
     plan: RemediationPlan | None = None
     evidence_summary: EvidenceSummary | None = None
     approval_summary: ApprovalSummary | None = None

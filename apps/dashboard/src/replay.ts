@@ -1,7 +1,10 @@
 import type { RunEvent } from './types';
 
-export async function loadReplayEvents(): Promise<RunEvent[]> {
-  const response = await fetch('/data/replay/disk-space-run.events.jsonl');
+const STATIC_BASE = import.meta.env.BASE_URL;
+const REPLAY_EVENT_DELAY_MS = 1450;
+
+export async function loadReplayEvents(scenarioId = 'disk-space'): Promise<RunEvent[]> {
+  const response = await fetch(`${STATIC_BASE}data/replay/${scenarioId}.events.jsonl`);
   if (!response.ok) {
     throw new Error('Replay data is unavailable.');
   }
@@ -25,8 +28,7 @@ export function playReplayEvents(
     }
     onEvent(event);
     index += 1;
-  }, 520);
+  }, REPLAY_EVENT_DELAY_MS);
 
   return () => window.clearInterval(timer);
 }
-

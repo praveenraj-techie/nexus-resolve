@@ -13,8 +13,10 @@ steps avoided, estimated MTTR reduction, and audit completeness.
 
 ## HCLTech Relevance
 
-The scenario maps to enterprise managed operations: alerts, SOPs, incident
-history, change approval, safe execution, validation, and RCA.
+The scenarios map to enterprise managed operations across Windows Infra,
+Database, IAM, Network, Linux, Firewall, Backup, Service Desk, AD, Command
+Centre, and Cloud teams: alerts, SOPs, incident history, change approval, safe
+execution, validation, and RCA.
 
 ## OpenAI Capabilities
 
@@ -22,18 +24,23 @@ history, change approval, safe execution, validation, and RCA.
 - Structured output wrapper for remediation plans and RCA.
 - Configurable `gpt-5.5` default model.
 - Deterministic fallback for resilient demos.
+- Visible proof strip that distinguishes OpenAI, deterministic fallback, and
+  replay/static evidence.
 
 ## Technical Excellence
 
 - FastAPI backend with tests.
 - React/Vite dashboard with replay and live modes.
 - WebSocket event stream with ordered audit events.
-- Explicit policy module and protected-path tests.
+- Explicit policy module and protected-resource tests.
 - No secrets or real enterprise data.
+- Identity-aware approval metadata.
+- Hashed audit packet endpoint for active runs.
+- ServiceNow-style mock connector contract for synthetic incidents.
+- Judge deep-dive page with live API JSON when the backend is online.
 
 ## Scalability
 
 The roadmap extends the pattern to ServiceNow, Intune or WinRM execution
 connectors, change management approval, SIEM export, and additional remediation
 playbooks.
-

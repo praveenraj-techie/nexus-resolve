@@ -19,19 +19,19 @@ FPS = 1
 SEGMENTS = [
     (
         "0:00-0:20",
-        "Problem: repetitive P3-P5 operations tickets consume time, but unsafe automation can delete active logs.",
+        "Problem: repetitive P3-P5 infrastructure tickets consume time, but unsafe automation can copy bad precedent.",
         "01-replay-start.png",
         20,
     ),
     (
         "0:20-0:45",
-        "Trigger: INC-2026-00421 shows APP-WIN-042 at 96% C: utilization with only 8 GB free.",
+        "Trigger: the selector now covers Windows, Database, IAM, VPN, Linux, Firewall, Backup, Service Desk, AD, Command Centre, and Cloud.",
         "01-replay-start.png",
         25,
     ),
     (
         "0:45-1:20",
-        "Evidence: the workflow retrieves SOP-WIN-DISK-001 and compares ten historical tickets.",
+        "Evidence: each scenario retrieves its SOP and compares safe, unsafe, and escalation historical tickets.",
         "02-sop-history-warning.png",
         35,
     ),
@@ -43,7 +43,7 @@ SEGMENTS = [
     ),
     (
         "1:50-2:30",
-        "Plan: PowerShell targets C:\\App\\Logs, filters files older than seven days, uses -WhatIf, and requires validation.",
+        "Plan: the action review and Live AI Proof strip show target resources, model source, safeguards, approval, and validation steps.",
         "03-plan-policy-approval.png",
         40,
     ),
@@ -55,13 +55,13 @@ SEGMENTS = [
     ),
     (
         "3:10-3:45",
-        "Mock execution: the approved flow changes only synthetic state and validates improvement to 44 GB free.",
+        "Mock execution: the approved flow changes only synthetic state and validates scenario-specific recovery metrics.",
         "06-live-resolved.png",
         35,
     ),
     (
         "3:45-4:30",
-        "Close: RCA, metrics, and audit trail show policy-grounded, approval-gated enterprise remediation.",
+        "Close: RCA, metrics, audit trail, deep-dive API JSON, and audit packet hash prove policy-grounded remediation.",
         "04-replay-rca-metrics.png",
         45,
     ),
@@ -142,4 +142,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

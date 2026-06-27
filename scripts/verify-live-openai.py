@@ -15,7 +15,7 @@ from app.orchestrator import RunManager  # noqa: E402
 from app.tools import get_default_incident  # noqa: E402
 
 
-async def wait_for_status(session, status: str, timeout: float = 40.0) -> None:
+async def wait_for_status(session, status: str, timeout: float = 120.0) -> None:
     deadline = asyncio.get_running_loop().time() + timeout
     while asyncio.get_running_loop().time() < deadline:
         if session.status == status:
@@ -30,11 +30,17 @@ async def main() -> int:
         return 2
 
     client = NexusOpenAIClient(mode="live")
+    if not client.api_key:
+        print("OPENAI_API_KEY is not loaded by the backend runtime.")
+        return 2
+
     manager = RunManager(openai_client=client)
     session = await manager.start_run(get_default_incident())
     await wait_for_status(session, "waiting_approval")
     manager.approve(session.run_id)
-    await wait_for_status(session, "resolved")
+    await wait_for_status(session, "waiting_closure")
+    manager.close_incident(session.run_id)
+    await wait_for_status(session, "closed")
 
     fallback_events = [
         event for event in session.stream.events if event.type == "openai.fallback"
@@ -54,4 +60,3 @@ async def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-

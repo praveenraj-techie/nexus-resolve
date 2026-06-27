@@ -10,4 +10,4 @@ __pycache__/
 .coverage
 *.log
 data/generated/
-apps/dashboard/public/data/replay/
+apps/dashboard/public/data/

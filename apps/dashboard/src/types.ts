@@ -2,6 +2,27 @@ export type Mode = 'replay' | 'live';
 
 export type EventPayload = Record<string, unknown> | null;
 
+export type AiSource = 'openai' | 'fallback';
+
+export type AiGeneratedPayload = {
+  ai_source?: AiSource;
+  generated_by?: string;
+  model?: string;
+};
+
+export type ScenarioSummary = {
+  scenario_id: string;
+  team: string;
+  alert_type: string;
+  incident_id: string;
+  priority: string;
+  title: string;
+  business_service: string;
+  affected_ci: string;
+  current_state: string;
+  requested_outcome: string;
+};
+
 export type RunEvent = {
   run_id: string;
   sequence: number;
@@ -21,17 +42,17 @@ export type PolicyCheck = {
 
 export type RemediationPlan = {
   summary: string;
-  target_paths: string[];
-  estimated_reclaim_gb: number;
-  age_filter_days: number;
-  powershell: string;
+  target_resources: string[];
+  action_preview: string;
+  estimated_effect: string;
+  safeguards: string[];
   approval_required: boolean;
   approval_granted: boolean;
-  uses_whatif: boolean;
+  uses_dry_run: boolean;
   mock_only: boolean;
   validation_steps: string[];
   escalation_condition: string;
-};
+} & AiGeneratedPayload;
 
 export type RcaSummary = {
   root_cause: string;
@@ -42,10 +63,22 @@ export type RcaSummary = {
   metrics: Record<string, number | string | boolean>;
 };
 
+export type ApprovalSummary = {
+  decision_required: boolean;
+  operator_message: string;
+  expected_safe_effect: string;
+  blocked_until_approved: boolean;
+  replay_side_effects_disabled: boolean;
+};
+
 export type TicketDetails = {
+  scenario_id: string;
+  team: string;
+  alert_type: string;
   incident_id: string;
   priority: string;
   ci: string;
   service: string;
+  current_state: string;
+  requested_outcome: string;
 };
-

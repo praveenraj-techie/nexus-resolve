@@ -23,9 +23,10 @@ def test_mock_client_returns_evidence_plan_approval_and_rca_summaries():
         checks = policy_check(plan, enforce_approval=False)
         approval = await client.create_approval_summary(plan, checks)
 
-        assert evidence.unsafe_precedent_ids == ["HIST-2026-0037"]
+        assert len(evidence.unsafe_precedent_ids) == 1
+        assert evidence.unsafe_precedent_ids[0].startswith("HIST-DISK")
         assert "SOP beats history" in evidence.governance_note
-        assert plan.target_paths == ["C:\\App\\Logs"]
+        assert plan.target_resources == ["APP-WIN-042:C:\\App\\Logs"]
         assert plan.mock_only is True
         assert approval.decision_required is True
         assert approval.blocked_until_approved is True
@@ -46,7 +47,7 @@ def test_live_client_falls_back_when_openai_call_fails():
 
         plan = await client.create_plan(ticket, sop, history, state)
 
-        assert plan.target_paths == ["C:\\App\\Logs"]
+        assert plan.target_resources == ["APP-WIN-042:C:\\App\\Logs"]
         assert client.last_notice == "OpenAI unavailable, using validated fallback response"
 
     asyncio.run(scenario())

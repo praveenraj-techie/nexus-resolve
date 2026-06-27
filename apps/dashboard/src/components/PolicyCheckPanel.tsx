@@ -3,9 +3,24 @@ import type { PolicyCheck } from '../types';
 
 type Props = {
   checks: PolicyCheck[];
+  backendOnline: boolean;
+  demoChecks: PolicyCheck[];
+  demoError?: string;
+  demoLoading: boolean;
+  onLoadDemo: () => void;
 };
 
-export function PolicyCheckPanel({ checks }: Props) {
+export function PolicyCheckPanel({
+  backendOnline,
+  checks,
+  demoChecks,
+  demoError,
+  demoLoading,
+  onLoadDemo,
+}: Props) {
+  const protectedBlock =
+    demoChecks.find((check) => check.name === 'Target scope') ?? demoChecks[0];
+
   return (
     <section className="panel policy-panel" aria-labelledby="policy-title">
       <div className="panel-heading">
@@ -22,15 +37,38 @@ export function PolicyCheckPanel({ checks }: Props) {
             </div>
           </article>
         ))}
-        <article className="check-row" data-status="blocked">
-          <span>blocked</span>
+        <div className="policy-demo-card">
           <div>
-            <strong>Protected-path demo</strong>
-            <p>C:\Windows\System32 cleanup is blocked as an unsafe remediation.</p>
+            <strong>Protected-Resource Block Demo</strong>
+            <p>
+              Fetches the real backend policy response for a blocked
+              C:\Windows\System32 remediation plan.
+            </p>
           </div>
-        </article>
+          <button type="button" onClick={onLoadDemo} disabled={!backendOnline || demoLoading}>
+            {demoLoading ? 'Checking...' : 'Show Real Block'}
+          </button>
+          {!backendOnline ? <span>Backend offline: start local live mode to fetch the API.</span> : null}
+          {demoError ? <span className="policy-demo-error">{demoError}</span> : null}
+        </div>
+        {protectedBlock ? (
+          <article className="check-row policy-demo-result" data-status={protectedBlock.status}>
+            <span>{protectedBlock.status.replace('_', ' ')}</span>
+            <div>
+              <strong>{protectedBlock.name}</strong>
+              <p>{protectedBlock.message}</p>
+            </div>
+          </article>
+        ) : (
+          <article className="check-row policy-demo-result" data-status="blocked">
+            <span>blocked</span>
+            <div>
+              <strong>Protected-resource demo pending</strong>
+              <p>C:\Windows\System32 will be blocked as an unsafe remediation target.</p>
+            </div>
+          </article>
+        )}
       </div>
     </section>
   );
 }
-

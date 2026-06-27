@@ -23,7 +23,7 @@ export function ApprovalBar({
           {mode === 'replay'
             ? 'Replay Mode: side effects disabled'
             : waitingForApproval
-              ? 'Operator decision required'
+              ? 'Review SOP, history, evidence summary, plan, and policy hold before remediation'
               : 'Waiting for approval stage'}
         </span>
       </div>
@@ -40,4 +40,3 @@ export function ApprovalBar({
     </section>
   );
 }
-

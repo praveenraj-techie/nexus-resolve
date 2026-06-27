@@ -15,13 +15,15 @@ Current verified metadata:
 It is 4 minutes and 30 seconds long and follows the required narration plan:
 
 1. Repetitive P3-P5 ticket burden.
-2. Synthetic disk-space ticket trigger.
+2. Scenario selector and synthetic infra alert trigger.
 3. SOP and similar historical tickets.
 4. Unsafe precedent detection.
-5. Safe PowerShell remediation review.
+5. Safe action remediation review.
 6. Human approval gate.
-7. Mock execution and disk validation.
-8. RCA, metrics, audit trail, and rubric alignment.
+7. Mock execution and scenario validation.
+8. Live AI Proof strip showing OpenAI/fallback/replay source.
+9. Deep-dive both-screen view with live API JSON and audit packet hash.
+10. RCA, metrics, audit trail, and rubric alignment.
 
 Regenerate after capturing fresh dashboard screenshots:
 

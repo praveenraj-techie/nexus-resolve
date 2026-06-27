@@ -14,6 +14,14 @@ export function TicketPanel({ ticket }: Props) {
       </div>
       <dl className="ticket-grid">
         <div>
+          <dt>Team</dt>
+          <dd>{ticket.team}</dd>
+        </div>
+        <div>
+          <dt>Alert</dt>
+          <dd>{ticket.alert_type}</dd>
+        </div>
+        <div>
           <dt>Incident</dt>
           <dd>{ticket.incident_id}</dd>
         </div>
@@ -31,14 +39,13 @@ export function TicketPanel({ ticket }: Props) {
         </div>
         <div>
           <dt>Current State</dt>
-          <dd>C: 96% used, 8 GB free</dd>
+          <dd>{ticket.current_state}</dd>
         </div>
         <div>
           <dt>Outcome</dt>
-          <dd>Reclaim space with SOP-approved cleanup</dd>
+          <dd>{ticket.requested_outcome}</dd>
         </div>
       </dl>
     </section>
   );
 }
-

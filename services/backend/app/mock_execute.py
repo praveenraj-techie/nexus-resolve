@@ -5,7 +5,6 @@ from typing import Any
 
 from .models import RemediationPlan
 from .policy import policy_check, has_blocking_check
-from .tools import get_expected_after_state
 
 
 def mock_execute(plan: RemediationPlan, state: dict[str, Any]) -> dict[str, Any]:
@@ -14,11 +13,12 @@ def mock_execute(plan: RemediationPlan, state: dict[str, Any]) -> dict[str, Any]
         blocked = ", ".join(check.name for check in checks if check.status == "blocked")
         raise ValueError(f"Policy blocked mock execution: {blocked}")
 
-    after = deepcopy(get_expected_after_state())
+    after = deepcopy(state.get("after_state", {}))
+    if not after:
+        raise ValueError("Scenario after-state is unavailable for mock execution.")
     after["execution_guard"] = {
         "mock_only": True,
         "source_state": state.get("snapshot_id"),
         "approved": plan.approval_granted,
     }
     return after
-

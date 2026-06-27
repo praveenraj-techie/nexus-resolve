@@ -3,11 +3,16 @@ from __future__ import annotations
 from .models import PolicyCheck, RemediationPlan
 
 
-PROTECTED_PATHS = (
+PROTECTED_RESOURCES = (
     "C:\\Windows",
     "C:\\Windows\\System32",
     "C:\\Program Files",
     "C:\\Users",
+    "/etc",
+    "/bin",
+    "/usr/bin",
+    "/var/lib",
+    "Domain Admins",
 )
 
 REAL_EXECUTION_MARKERS = (
@@ -17,6 +22,10 @@ REAL_EXECUTION_MARKERS = (
     "remove-item -recurse -force c:\\",
     "format-volume",
     "clear-disk",
+    "terminate-instances",
+    "delete-user",
+    "delete restore point",
+    "any-any allow",
 )
 
 
@@ -24,9 +33,9 @@ def normalize_path(path: str) -> str:
     return path.replace("/", "\\").rstrip("\\").casefold()
 
 
-def touches_protected_path(path: str) -> bool:
-    normalized = normalize_path(path)
-    for protected in PROTECTED_PATHS:
+def touches_protected_resource(resource: str) -> bool:
+    normalized = normalize_path(resource)
+    for protected in PROTECTED_RESOURCES:
         protected_normalized = normalize_path(protected)
         if normalized == protected_normalized or normalized.startswith(
             f"{protected_normalized}\\"
@@ -45,44 +54,57 @@ def policy_check(
 ) -> list[PolicyCheck]:
     checks: list[PolicyCheck] = []
 
-    protected_hits = [path for path in plan.target_paths if touches_protected_path(path)]
+    protected_hits = [
+        resource
+        for resource in plan.target_resources
+        if touches_protected_resource(resource)
+    ]
     checks.append(
         PolicyCheck(
-            name="Protected paths",
+            name="Target scope",
             status="blocked" if protected_hits else "pass",
             message=(
-                "Plan touches protected paths and cannot continue."
+                "Plan touches protected resources and cannot continue."
                 if protected_hits
-                else "No protected system, program, or user paths are targeted."
+                else "Targets are limited to approved scenario resources."
             ),
-            evidence={"protected_hits": protected_hits, "target_paths": plan.target_paths},
+            evidence={
+                "protected_hits": protected_hits,
+                "target_resources": plan.target_resources,
+            },
         )
     )
 
     checks.append(
         PolicyCheck(
-            name="Age filter",
-            status="pass" if plan.age_filter_days >= 7 else "blocked",
+            name="Safeguards",
+            status="pass" if plan.safeguards else "blocked",
             message=(
-                "Plan deletes only logs older than the 7-day SOP minimum."
-                if plan.age_filter_days >= 7
-                else "Plan lacks the required 7-day minimum age filter."
+                "Plan includes explicit safety safeguards."
+                if plan.safeguards
+                else "Plan lacks explicit safety safeguards."
             ),
-            evidence={"age_filter_days": plan.age_filter_days},
+            evidence={"safeguards": plan.safeguards},
         )
     )
 
-    has_whatif = "-whatif" in plan.powershell.casefold() or plan.uses_whatif
+    action = plan.action_preview.casefold()
+    has_dry_run = (
+        "mock" in action
+        or "dry-run" in action
+        or "-whatif" in action
+        or plan.uses_dry_run
+    )
     checks.append(
         PolicyCheck(
             name="Dry-run guard",
-            status="pass" if has_whatif or plan.mock_only else "blocked",
+            status="pass" if has_dry_run or plan.mock_only else "blocked",
             message=(
-                "Plan includes a WhatIf or mock-only guard."
-                if has_whatif or plan.mock_only
+                "Plan uses a dry-run or mock-only action preview."
+                if has_dry_run or plan.mock_only
                 else "Plan lacks a dry-run guard and is blocked."
             ),
-            evidence={"uses_whatif": has_whatif, "mock_only": plan.mock_only},
+            evidence={"uses_dry_run": has_dry_run, "mock_only": plan.mock_only},
         )
     )
 
@@ -123,7 +145,7 @@ def policy_check(
         )
     )
 
-    real_execution_detected = has_destructive_real_execution(plan.powershell)
+    real_execution_detected = has_destructive_real_execution(plan.action_preview)
     checks.append(
         PolicyCheck(
             name="Mock-only execution",
@@ -145,4 +167,3 @@ def policy_check(
 
 def has_blocking_check(checks: list[PolicyCheck]) -> bool:
     return any(check.status == "blocked" for check in checks)
-
